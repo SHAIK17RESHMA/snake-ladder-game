@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Snake & Ladders</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --panel-bg: rgba(255, 255, 255, 0.7);
+            --cell-bg: rgba(255, 255, 255, 0.9);
+            --text-color: #2d3436;
+            --accent-color: #6c5ce7;
+            --board-shadow: 0 20px 50px rgba(0,0,0,0.1);
+        }
+
+        /* Theme: Snow */
+        body.theme-snow {
+            --bg-gradient: linear-gradient(180deg, #e0f2f1 0%, #ffffff 100%);
+            --panel-bg: rgba(255, 255, 255, 0.6);
+            --cell-bg: #ffffff;
+            --accent-color: #00bcd4;
+        }
+
+        /* Theme: Holi */
+        body.theme-holi {
+            --bg-gradient: linear-gradient(45deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%);
+            --panel-bg: rgba(255, 255, 255, 0.8);
+            --cell-bg: #fffcf2;
+            --accent-color: #e91e63;
+        }
+
+        /* Theme: Jungle */
+        body.theme-jungle {
+            --bg-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --panel-bg: rgba(255, 255, 255, 0.7);
+            --cell-bg: #f1f8e9;
+            --accent-color: #2e7d32;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: background 0.5s ease;
+            color: var(--text-color);
+        }
+
+        /* Particles / Background Effects */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Game Container */
+        .game-wrapper {
+            display: flex;
+            flex-direction: row;
+            gap: 2rem;
+            align-items: center;
+            max-width: 95vw;
+            max-height: 90vh;
+            padding: 1rem;
+            z-index: 10;
+        }
+
+        @media (max-width: 900px) {
+            .game-wrapper { flex-direction: column; gap: 1rem; overflow-y: auto; }
+            .board-container { width: 320px !important; height: 320px !important; }
+        }
+
+        /* Board Styling */
+        .board-container {
+            position: relative;
+            width: 550px;
+            height: 550px;
+            background: var(--cell-bg);
+            border-radius: 12px;
+            box-shadow: var(--board-shadow);
+            padding: 10px;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            gap: 4px;
+        }
+
+        .cell {
+            position: relative;
+            background: var(--cell-bg);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: rgba(0,0,0,0.3);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
+            transition: all 0.3s ease;
+            z-index: 2;
+        }
+
+        /* Snakes and Ladders Overlays */
+        #svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        /* Players */
+        .player {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            z-index: 10;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .player-1 { background: #6c5ce7; }
+        .player-2 { background: #ff7675; }
+
+        .active-player {
+            box-shadow: 0 0 15px currentColor;
+            transform: scale(1.2);
+        }
+
+        /* UI Panel */
+        .ui-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(15px);
+            padding: 1.5rem;
+            border-radius: 20px;
+            width: 280px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .dice-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(255,255,255,0.4);
+            border-radius: 15px;
+        }
+
+        .dice {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .dice:active { transform: scale(0.9); }
+        .dice.rolling { animation: roll 0.4s infinite linear; }
+
+        @keyframes roll {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-badge {
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            text-align: center;
+            background: rgba(0,0,0,0.05);
+            font-weight: 600;
+        }
+
+        .btn {
+            padding: 0.75rem;
+            border-radius: 12px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+        }
+
+        .btn-primary { background: var(--accent-color); color: white; }
+        .btn-secondary { background: rgba(0,0,0,0.05); color: var(--text-color); }
+        .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+
+        /* Modal */
+        #modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 24px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+        }
+
+        .theme-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .theme-dot.active { border-color: #2d3436; }
+    </style>
+</head>
+<body class="theme-snow">
+    <canvas id="bg-canvas"></canvas>
+
+    <header class="mb-4 text-center">
+        <h1 class="text-xl font-bold tracking-tight opacity-80">SNAKE & LADDERS</h1>
+        <p class="text-[10px] uppercase tracking-widest opacity-40">Premium Edition</p>
+    </header>
+
+    <div class="game-wrapper">
+        <!-- Board -->
+        <div class="board-container" id="board">
+            <svg id="svg-layer" viewBox="0 0 550 550"></svg>
+            <!-- Cells generated by JS -->
+            <div id="p1" class="player player-1"></div>
+            <div id="p2" class="player player-2"></div>
+        </div>
+
+        <!-- UI -->
+        <div class="ui-panel">
+            <div class="flex justify-between items-center">
+                <span class="text-xs font-bold opacity-60">CONTROLS</span>
+                <div class="flex gap-2">
+                    <div class="theme-dot bg-blue-100 active" onclick="setTheme('snow')" title="Snow"></div>
+                    <div class="theme-dot bg-pink-200" onclick="setTheme('holi')" title="Holi"></div>
+                    <div class="theme-dot bg-green-200" onclick="setTheme('jungle')" title="Jungle"></div>
+                </div>
+            </div>
+
+            <div class="dice-container">
+                <div id="dice" class="dice">🎲</div>
+                <button class="btn btn-primary w-full" id="roll-btn">Roll Dice</button>
+                <div id="status" class="status-badge w-full">Your Turn</div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <div class="flex justify-between text-xs font-bold px-1">
+                    <span class="text-indigo-600">Player: <span id="p1-pos">1</span></span>
+                    <span class="text-red-500">CPU: <span id="p2-pos">1</span></span>
+                </div>
+                <button class="btn btn-secondary text-[10px]" onclick="toggleMute()">Toggle Sound: <span id="mute-status">ON</span></button>
+                <button class="btn btn-secondary text-[10px]" onclick="location.reload()">Restart Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Win Modal -->
+    <div id="modal-overlay">
+        <div class="modal-content">
+            <h2 id="winner-text" class="text-3xl font-black mb-4">YOU WIN!</h2>
+            <p class="text-gray-500 mb-6">Congratulations on a spectacular victory!</p>
+            <button class="btn btn-primary px-8" onclick="location.reload()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & STATE ---
+        const boardSize = 10;
+        const snakes = { 98: 78, 95: 75, 93: 73, 87: 24, 64: 60, 62: 19, 56: 53, 49: 11, 48: 26, 16: 6 };
+        const ladders = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+        
+        let gameState = {
+            players: [
+                { id: 1, pos: 1, el: document.getElementById('p1'), color: '#6c5ce7' },
+                { id: 2, pos: 1, el: document.getElementById('p2'), color: '#ff7675' }
+            ],
+            currentPlayer: 0, // 0 for human, 1 for CPU
+            isRolling: false,
+            isMuted: false,
+            theme: 'snow'
+        };
+
+        const boardEl = document.getElementById('board');
+        const svgLayer = document.getElementById('svg-layer');
+
+        // --- AUDIO ---
+        const sounds = {
+            roll: new Audio('https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3'),
+            move: new Audio('https://assets.mixkit.co/active_storage/sfx/2014/2014-preview.mp3'),
+            snake: new Audio('https://assets.mixkit.co/active_storage/sfx/2026/2026-preview.mp3'),
+            ladder: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'),
+            win: new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3')
+        };
+
+        function playSfx(key) {
+            if (!gameState.isMuted) {
+                sounds[key].currentTime = 0;
+                sounds[key].play().catch(() => {});
+            }
+        }
+
+        function toggleMute() {
+            gameState.isMuted = !gameState.isMuted;
+            document.getElementById('mute-status').textContent = gameState.isMuted ? 'OFF' : 'ON';
+        }
+
+        // --- THEMES ---
+        function setTheme(theme) {
+            document.body.className = `theme-${theme}`;
+            gameState.theme = theme;
+            document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active'));
+            event.target.classList.add('active');
+            initParticles();
+        }
+
+        // --- BOARD GENERATION ---
+        function createBoard() {
+            for (let i = 100; i >= 1; i--) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.id = `cell-${i}`;
+                
+                // Calculate display number (Boustrophedon / Snake pattern)
+                let row = Math.floor((i - 1) / 10);
+                let col = (i - 1) % 10;
+                let displayNum;
+                
+                if (row % 2 === 0) {
+                    displayNum = i;
+                } else {
+                    // Reverse columns for odd rows
+                    let startOfRow = row * 10 + 1;
+                    let endOfRow = (row + 1) * 10;
+                    displayNum = endOfRow - (i - startOfRow);
+                }
+
+                cell.textContent = i;
+                boardEl.appendChild(cell);
+            }
+        }
+
+        function getCellCoords(num) {
+            const cell = document.getElementById(`cell-${num}`);
+            const rect = cell.getBoundingClientRect();
+            const boardRect = boardEl.getBoundingClientRect();
+            return {
+                x: rect.left - boardRect.left + rect.width / 2,
+                y: rect.top - boardRect.top + rect.height / 2
+            };
+        }
+
+        function drawConnections() {
+            svgLayer.innerHTML = '';
+            
+            // Draw Ladders
+            Object.entries(ladders).forEach(([start, end]) => {
+                const s = getCellCoords(start);
+                const e = getCellCoords(end);
+                
+                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                group.style.opacity = "0.6";
+
+                // Side rails
+                const line1 = createSvgLine(s.x-5, s.y, e.x-5, e.y, "#8d6e63", 4);
+                const line2 = createSvgLine(s.x+5, s.y, e.x+5, e.y, "#8d6e63", 4);
+                group.appendChild(line1);
+                group.appendChild(line2);
+
+                // Rungs
+                const steps = 6;
+                for(let i=1; i<steps; i++){
+                    const rx = s.x + (e.x - s.x) * (i/steps);
+                    const ry = s.y + (e.y - s.y) * (i/steps);
+                    const rung = createSvgLine(rx-8, ry, rx+8, ry, "#8d6e63", 3);
+                    group.appendChild(rung);
+                }
+                svgLayer.appendChild(group);
+            });
+
+            // Draw Snakes
+            Object.entries(snakes).forEach(([start, end]) => {
+                const s = getCellCoords(start);
+                const e = getCellCoords(end);
+                
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const cp1x = s.x + (e.x - s.x) * 0.2 + 40;
+                const cp1y = s.y + (e.y - s.y) * 0.5;
+                const cp2x = s.x + (e.x - s.x) * 0.8 - 40;
+                const cp2y = s.y + (e.y - s.y) * 0.5;
+
+                path.setAttribute("d", `M ${s.x} ${s.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${e.x} ${e.y}`);
+                path.setAttribute("stroke", "#ff5252");
+                path.setAttribute("stroke-width", "8");
+                path.setAttribute("fill", "none");
+                path.setAttribute("stroke-linecap", "round");
+                path.setAttribute("stroke-dasharray", "5,5");
+                path.style.opacity = "0.5";
+                
+                svgLayer.appendChild(path);
+            });
+        }
+
+        function createSvgLine(x1, y1, x2, y2, color, width) {
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("stroke", color);
+            line.setAttribute("stroke-width", width);
+            line.setAttribute("stroke-linecap", "round");
+            return line;
+        }
+
+        // --- GAME LOGIC ---
+        async function movePlayer(playerIdx, steps) {
+            const player = gameState.players[playerIdx];
+            const startPos = player.pos;
+            let endPos = startPos + steps;
+
+            if (endPos > 100) return; // Cannot move past 100
+
+            // Step by step move
+            for (let i = 1; i <= steps; i++) {
+                player.pos++;
+                updatePlayerPosition(playerIdx);
+                playSfx('move');
+                await new Promise(r => setTimeout(r, 250));
+            }
+
+            // Check Snake or Ladder
+            if (ladders[player.pos]) {
+                await new Promise(r => setTimeout(r, 300));
+                player.pos = ladders[player.pos];
+                updatePlayerPosition(playerIdx);
+                playSfx('ladder');
+            } else if (snakes[player.pos]) {
+                await new Promise(r => setTimeout(r, 300));
+                player.pos = snakes[player.pos];
+                updatePlayerPosition(playerIdx);
+                playSfx('snake');
+            }
+
+            if (player.pos === 100) {
+                showWin(playerIdx === 0 ? "YOU" : "COMPUTER");
+                return;
+            }
+
+            // Next turn
+            gameState.currentPlayer = gameState.currentPlayer === 0 ? 1 : 0;
+            updateTurnUI();
+            
+            if (gameState.currentPlayer === 1) {
+                setTimeout(cpuTurn, 1000);
+            }
+        }
+
+        function updatePlayerPosition(idx) {
+            const player = gameState.players[idx];
+            const coords = getCellCoords(player.pos);
+            player.el.style.left = `${coords.x - 12}px`;
+            player.el.style.top = `${coords.y - 12}px`;
+            
+            document.getElementById(`p${idx+1}-pos`).textContent = player.pos;
+        }
+
+        function updateTurnUI() {
+            const status = document.getElementById('status');
+            const rollBtn = document.getElementById('roll-btn');
+            
+            if (gameState.currentPlayer === 0) {
+                status.textContent = "Your Turn";
+                status.style.background = "rgba(108, 92, 231, 0.2)";
+                rollBtn.disabled = false;
+                gameState.players[0].el.classList.add('active-player');
+                gameState.players[1].el.classList.remove('active-player');
+            } else {
+                status.textContent = "Computer is thinking...";
+                status.style.background = "rgba(255, 118, 117, 0.2)";
+                rollBtn.disabled = true;
+                gameState.players[1].el.classList.add('active-player');
+                gameState.players[0].el.classList.remove('active-player');
+            }
+        }
+
+        async function rollDice() {
+            if (gameState.isRolling || gameState.currentPlayer !== 0) return;
+            
+            gameState.isRolling = true;
+            const diceEl = document.getElementById('dice');
+            diceEl.classList.add('rolling');
+            playSfx('roll');
+
+            await new Promise(r => setTimeout(r, 800));
+            
+            const roll = Math.floor(Math.random() * 6) + 1;
+            const diceIcons = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+            diceEl.textContent = diceIcons[roll - 1];
+            diceEl.classList.remove('rolling');
+            
+            gameState.isRolling = false;
+            movePlayer(0, roll);
+        }
+
+        async function cpuTurn() {
+            const diceEl = document.getElementById('dice');
+            diceEl.classList.add('rolling');
+            playSfx('roll');
+
+            await new Promise(r => setTimeout(r, 800));
+            
+            const roll = Math.floor(Math.random() * 6) + 1;
+            const diceIcons = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+            diceEl.textContent = diceIcons[roll - 1];
+            diceEl.classList.remove('rolling');
+
+            movePlayer(1, roll);
+        }
+
+        function showWin(winner) {
+            playSfx('win');
+            document.getElementById('winner-text').textContent = `${winner} WON!`;
+            document.getElementById('modal-overlay').style.display = 'flex';
+            startConfetti();
+        }
+
+        // --- BACKGROUND EFFECTS ---
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function initParticles() {
+            particles = [];
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const count = 50;
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    r: Math.random() * 3 + 1,
+                    d: Math.random() * 1,
+                    v: Math.random() * 1 + 0.5
+                });
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (gameState.theme === 'snow') {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    p.y += p.v;
+                    p.x += Math.sin(p.y/20);
+                    if (p.y > canvas.height) p.y = -10;
+                });
+            } else if (gameState.theme === 'holi') {
+                const colors = ['#f44336', '#e91e63', '#9c27b0', '#2196f3', '#ffeb3b'];
+                particles.forEach((p, i) => {
+                    ctx.fillStyle = colors[i % colors.length];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r * 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    p.y += p.v * 0.5;
+                    if (p.y > canvas.height) p.y = -10;
+                });
+            } else {
+                ctx.fillStyle = 'rgba(76, 175, 80, 0.2)';
+                particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.ellipse(p.x, p.y, p.r * 2, p.r, Math.PI/4, 0, Math.PI * 2);
+                    ctx.fill();
+                    p.y += p.v * 0.3;
+                    if (p.y > canvas.height) p.y = -10;
+                });
+            }
+            requestAnimationFrame(animateParticles);
+        }
+
+        // --- INIT ---
+        window.onload = () => {
+            createBoard();
+            drawConnections();
+            updatePlayerPosition(0);
+            updatePlayerPosition(1);
+            initParticles();
+            animateParticles();
+            updateTurnUI();
+
+            document.getElementById('roll-btn').addEventListener('click', rollDice);
+            window.addEventListener('resize', () => {
+                initParticles();
+                drawConnections();
+                updatePlayerPosition(0);
+                updatePlayerPosition(1);
+            });
+        };
+
+        // Confetti helper
+        function startConfetti() {
+            // Simple canvas confetti
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+            for(let i=0; i<100; i++) {
+                const div = document.createElement('div');
+                div.style.position = 'fixed';
+                div.style.left = Math.random() * 100 + 'vw';
+                div.style.top = '-10px';
+                div.style.width = '10px';
+                div.style.height = '10px';
+                div.style.background = colors[Math.floor(Math.random() * colors.length)];
+                div.style.zIndex = '1000';
+                div.style.borderRadius = '50%';
+                div.style.pointerEvents = 'none';
+                document.body.appendChild(div);
+
+                const animation = div.animate([
+                    { transform: 'translateY(0) rotate(0)', opacity: 1 },
+                    { transform: `translateY(100vh) translateX(${Math.random()*200-100}px) rotate(720deg)`, opacity: 0 }
+                ], {
+                    duration: 2000 + Math.random() * 3000,
+                    easing: 'cubic-bezier(0, .9, .57, 1)'
+                });
+                animation.onfinish = () => div.remove();
+            }
+        }
+    </script>
+</body>
+</html>
